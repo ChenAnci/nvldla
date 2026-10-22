@@ -1,0 +1,25 @@
+{
+  "hotkey": "F8",
+  "answer_opacity": 100,
+  "prompt": "请分析图片中的题目并给出答案：\n如果是选择题，请直接给出答案选项，如“A”；\n如果是多选题，请直接给出答案选项，如“AD”；\n如果是代码题，请直接给出 Python 代码，不需要注释，尽量简洁。",
+  "placeholder_text": "A",
+  "provider": "doubao",
+  "model": "自动思考",
+  "extract_answer": true,
+  "window_x": 60,
+  "window_y": 60,
+  "window_w": 480,
+  "window_h": 320,
+  "font_size": 11,
+  "control_hotkeys": {
+    "scroll_up": "NumPad8",
+    "scroll_down": "NumPad2",
+    "move_left": "NumPad4",
+    "move_right": "NumPad6",
+    "move_down": "NumPad1",
+    "move_up": "NumPad3",
+    "opacity_down": "NumPad7",
+    "opacity_up": "NumPad9",
+    "shot": "NumPad5"
+  }
+}

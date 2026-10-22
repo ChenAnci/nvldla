@@ -1,0 +1,2 @@
+# NVlDlA GUI 运行依赖（webchat 的依赖见仓库根 requirements.txt）
+PyQt6>=6.6

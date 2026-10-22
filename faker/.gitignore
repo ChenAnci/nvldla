@@ -1,0 +1,29 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ===== 虚拟环境（绝不提交）=====
+.venv/
+venv/
+env/
+
+# ===== 登录凭证 / 会话（绝不提交！）=====
+config.json
+webchat/config.json
+webchat/sessions/
+webchat/deepseek_cookies.json
+webchat/.browser/
+
+# ===== 调研与临时文件 =====
+.research/
+*.log
+*.tmp
+verify_result.txt
+venv_result.txt
+
+# ===== 系统 =====
+.DS_Store
+Thumbs.db
+desktop.ini

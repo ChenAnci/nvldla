@@ -1,0 +1,9 @@
+{
+  "deepseek": {
+    "token": ""
+  },
+  "doubao": {
+    "session_file": "webchat/sessions/doubao.json",
+    "cookie_header": ""
+  }
+}

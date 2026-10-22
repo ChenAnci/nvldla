@@ -1,0 +1,33 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ===== 虚拟环境（绝不提交）=====
+.venv/
+venv/
+env/
+
+# ===== 登录凭证 / 会话（绝不提交！）=====
+# 注意：带斜杠的模式会锚定仓库根目录，实际文件在 faker/webchat/ 下，故用 **/ 匹配任意深度
+config.json
+**/webchat/config.json
+**/webchat/sessions/
+**/webchat/deepseek_cookies.json
+**/webchat/.browser/
+
+# ===== 本地配置与运行产物 =====
+nvldla_config.json
+*.log
+_crash.txt
+_err.txt
+
+# ===== 系统 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== PyInstaller 构建产物 =====
+build/
+dist/
