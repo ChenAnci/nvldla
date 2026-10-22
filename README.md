@@ -1,6 +1,6 @@
 # NVlDlA —— 悬浮截图问答助手（screenshotask + faker/webchat 单仓库）
 
-> 按 **F8**（可改）截取整个屏幕 → 发给豆包 / DeepSeek 网页版 → 完整回答后自动提炼出最终答案，流式显示在最前端悬浮窗。
+> 按 **F8**（可改）截取整个屏幕 → 发给豆包 / DeepSeek 网页版、**任意 OpenAI 兼容 API** 或**本机 DeepSeek Harness** → 完整回答后自动提炼出最终答案，流式显示在最前端悬浮窗。
 > 悬浮窗通过 `SetWindowDisplayAffinity` 从系统截图中排除，Ctrl+Win+S / PrtSc 截不到。
 >
 > ⚠️ 仅供学习与个人研究使用，请勿用于商业用途或高频自动化。请自行承担账号风控风险。
@@ -106,7 +106,32 @@ faker\.venv\Scripts\python.exe -m webchat login deepseek  :: DeepSeek：浏览�
 
 - 默认全局热键 **F8**：截图 → 提问 → 完整回答 → 自动提炼最终答案，流式显示在悬浮窗（可在设置里关闭二次提取）
 - 托盘图标右键：设置 / 显示隐藏悬浮窗 / 退出
-- 设置里可改热键、提供商（豆包/DeepSeek）、模型、透明度等；小键盘 1~9 控制悬浮窗移动 / 滚动 / 透明度
+- 设置里可改热键、提供商（豆包 / DeepSeek / api / dsh，见下节）、模型、透明度等；小键盘 1~9 控制悬浮窗移动 / 滚动 / 透明度
+
+## 🧠 四通道提供商（本分支新增）
+
+设置 →「提供商」可选 4 种回答引擎：
+
+| 提供商 | 说明 | 前置条件 |
+|---|---|---|
+| `doubao` | 豆包网页版（免费复用登录态） | 扫码登录一次 |
+| `deepseek` | DeepSeek 网页版 | 浏览器登录一次；需要 Node.js |
+| `api` | **任意 OpenAI 兼容 API**（官方 / 中转 / 自建服务） | 填 API Base、API Key、模型名 |
+| `dsh` | **本机 DeepSeek Harness**（headless 引擎作答） | 已安装 DeepSeek Harness 且配好频道 |
+
+**api 通道**
+
+- 「API Base」填 OpenAI 兼容端点（例如 `https://api.deepseek.com`，按服务商要求决定带不带 `/v1`），「模型名」默认 `deepseek-flash`
+- 设置页有「**测试连接**」按钮，一键验证 Key 与端点是否可用
+- 「**从 Harness 导入**」按钮：把本机 DeepSeek Harness 里已配好的频道（Base / Key / 模型）一键导入 api 通道，免手抄
+
+**dsh 通道**
+
+- 截图保存为本地临时图片，把「图片路径 + 问题」交给本机 Harness 的 headless 引擎作答，答案流式回到悬浮窗
+- 该类会话写在 Harness 的独立 headless profile，**桌面端聊天列表不会显示**（属正常现象）
+- 回答走全本地链路，不经第三方中转
+
+> `api` 通道的 Key 只保存在本地 `screenshotask/nvldla_config.json`，已被 `.gitignore` 排除，**绝不会提交进仓库**。
 
 ## 🔧 常见问题
 
