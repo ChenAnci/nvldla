@@ -25,6 +25,8 @@ class ChatWorker(QThread):
     failed = pyqtSignal(str)           # 失败，携带错误信息
     phase_changed = pyqtSignal(str)    # 阶段切换提示（如"提取答案中…"）
 
+    full_answer = pyqtSignal(str)      # 阶段1完整回答（提取前全文，供历史留档）
+
     def __init__(
         self,
         provider: str,
@@ -56,6 +58,7 @@ class ChatWorker(QThread):
                 **self._model_kwargs,
             )
             full = (r1.text or "").strip()
+            self.full_answer.emit(full)  # 先把全量交出去（无论后续成败都留档）
             if not full:
                 self.finished_ok.emit("（AI 没有返回内容）")
                 return

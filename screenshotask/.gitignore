@@ -6,6 +6,8 @@ __pycache__/
 
 # ===== 本地配置与运行产物（不提交）=====
 nvldla_config.json
+nvldla_history.jsonl
+history_shots/
 nvldla_debug.log
 _crash.txt
 _err.txt

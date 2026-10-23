@@ -19,6 +19,8 @@ config.json
 
 # ===== 本地配置与运行产物 =====
 nvldla_config.json
+**/nvldla_history.jsonl
+**/history_shots/
 *.log
 _crash.txt
 _err.txt

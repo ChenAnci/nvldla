@@ -110,8 +110,9 @@ faker\.venv\Scripts\python.exe -m webchat login deepseek
 ### 4. 使用
 
 - 默认热键 **F8**：截图 → 提问 → 完整回答 → 提炼最终答案，悬浮窗流式显示（设置里可改热键、关闭二次提取）
-- 托盘图标右键：设置 / 显示隐藏悬浮窗 / 退出
+- 托盘图标右键：设置 / 提问历史 / 显示隐藏悬浮窗 / 退出
 - 小键盘 1~9：悬浮窗移动 / 滚动 / 透明度
+- 托盘「提问历史」：每次提问自动留档（时间 / 通道 / 问题 / 最终答案 / 提取前完整回答 / 截图副本），可搜索、点开详情、点击截图直接打开
 - 提供商、模型、透明度都在「设置」里改；`api` 通道的「测试连接」「从 Harness 导入」按钮也在设置页
 
 ## 🔧 常见问题
@@ -127,7 +128,7 @@ faker\.venv\Scripts\python.exe -m webchat login deepseek
 
 ## 🔒 隐私说明
 
-- 登录态与 Key 全部只存本地，并已被 `.gitignore` 排除：`nvldla_config.json`（含 api Key）、`webchat/sessions/`、cookies、浏览器缓存 —— 不会进仓库
+- 登录态与 Key 全部只存本地，并已被 `.gitignore` 排除：`nvldla_config.json`（含 api Key）、`nvldla_history.jsonl` 与 `history_shots/`（提问历史与截图副本）、`webchat/sessions/`、cookies、浏览器缓存 —— 不会进仓库
 - 网页通道直连豆包 / DeepSeek 官网接口；`api` 通道只发给你自己填的服务商；`dsh` 通道留在本机 Harness —— 项目本身不设任何第三方服务器
 - 悬浮窗默认把自己排除在系统截屏之外（依赖系统 API；基于传统抓屏方式的老工具可能仍能截到）
 

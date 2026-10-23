@@ -38,6 +38,8 @@ from PyQt6.QtWidgets import (
 
 from chat_worker import ChatWorker
 from config import AppConfig
+from history import append_record, archive_shot
+from history_window import HistoryWindow
 from hotkey import GlobalHotkey, HotkeyError
 from overlay import OverlayWindow
 from settings import SettingsDialog, shutdown_login_workers
@@ -139,6 +141,10 @@ class NvldlaApp:
         self.overlay = OverlayWindow(self.cfg, CONFIG_PATH)
         self.overlay.setWindowIcon(icon)
         self.worker: ChatWorker | None = None
+        # 历史留档状态：本次截图路径 / 阶段1完整回答 / 历史窗口单例
+        self._last_shot: Path | None = None
+        self._pending_full = ""
+        self._history_win: HistoryWindow | None = None
 
         self.hotkey = GlobalHotkey()
         self.hotkey.activated.connect(self.on_hotkey)
@@ -170,11 +176,15 @@ class NvldlaApp:
         settings_action = QAction("设置", menu)
         settings_action.triggered.connect(self.open_settings)
 
+        history_action = QAction("提问历史", menu)
+        history_action.triggered.connect(self.open_history)
+
         quit_action = QAction("退出", menu)
         quit_action.triggered.connect(self.quit)
 
         menu.addAction(toggle_action)
         menu.addAction(settings_action)
+        menu.addAction(history_action)
         menu.addSeparator()
         menu.addAction(quit_action)
 
@@ -276,6 +286,8 @@ class NvldlaApp:
             return
         self.overlay.set_status("上传并提问中…", COLOR_WORKING)
 
+        self._last_shot = shot_path
+        self._pending_full = ""
         self.worker = ChatWorker(
             self.cfg.provider, self.cfg.prompt, str(shot_path), self.cfg.model_kwargs,
             extract_answer=self.cfg.extract_answer,
@@ -285,6 +297,7 @@ class NvldlaApp:
         self.worker.finished_ok.connect(self._on_finished)
         self.worker.failed.connect(self._on_failed)
         self.worker.phase_changed.connect(self._on_phase)
+        self.worker.full_answer.connect(self._on_full)
         self.worker.start()
 
     def capture_screenshot(self) -> Path:
@@ -301,12 +314,61 @@ class NvldlaApp:
     def _on_finished(self, text: str) -> None:
         self.overlay.set_answer(text)
         self.overlay.set_status("完成", COLOR_DONE)
+        self._archive_answer(status="ok", answer=text, error="")
+
+    def _on_full(self, text: str) -> None:
+        """阶段1完整回答（提取前全文），先缓存供最终留档。"""
+        self._pending_full = text
+
+    def _archive_answer(self, *, status: str, answer: str, error: str) -> None:
+        """问答结束本地留档：一行 JSON + 截图副本。
+
+        只做文件 IO，可运行于任意线程；任何异常静默吞掉——
+        留档永远不能影响问答主流程。
+        """
+        try:
+            from datetime import datetime
+            now = datetime.now()
+            rec = {
+                "ts": now.strftime("%Y-%m-%d %H:%M:%S"),
+                "provider": self.cfg.provider,
+                "model": self._model_label(),
+                "prompt": self.cfg.prompt,
+                "answer": answer,
+                "full": self._pending_full,
+                "status": status,
+                "error": error,
+                "shot": archive_shot(BASE_DIR, self._last_shot),
+                "extract": bool(self.cfg.extract_answer),
+            }
+            append_record(BASE_DIR, rec)
+        except Exception:
+            pass
+        finally:
+            self._pending_full = ""
+
+    def _model_label(self) -> str:
+        if self.cfg.provider == "api":
+            return (self.cfg.model_kwargs.get("model") or "").strip()
+        if self.cfg.provider == "dsh":
+            return "跟随 Harness"
+        return (self.cfg.model or "").strip()
+
+    def open_history(self) -> None:
+        if self._history_win is None:
+            self._history_win = HistoryWindow(BASE_DIR)
+            self._history_win.setWindowIcon(self.tray.icon())
+        self._history_win.refresh()
+        self._history_win.show()
+        self._history_win.raise_()
+        self._history_win.activateWindow()
 
     def _on_phase(self, message: str) -> None:
         """阶段切换提示（如进入"提取答案中…"）。"""
         self.overlay.set_status(message, COLOR_WORKING)
 
     def _on_failed(self, message: str) -> None:
+        self._archive_answer(status="error", answer="", error=message)
         self.overlay.set_status("失败", COLOR_ERROR)
         hint = ""
         if self.cfg.provider == "api":
@@ -363,6 +425,8 @@ class NvldlaApp:
         if self.worker is not None:
             self.worker.wait(3000)
         shutdown_login_workers()
+        if self._history_win is not None:
+            self._history_win.close()
         self._unregister_control_hotkeys()
         self.hotkey.unregister()
         self.tray.hide()
