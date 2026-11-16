@@ -21,6 +21,12 @@
 - 背景恒为色键黑（全透明），除文本外窗口全部透明
 - 文本透明度：整窗 alpha 0（隐形）→ 255（全显灰色），真实半透明
 - 任意位置拖动、边缘缩放；滚轮滚动；双击隐藏
+- **永不抢前台/焦点（WS_EX_NOACTIVATE）**：鼠标点它、拖它都不会把
+  它变成前台窗口，正在用的窗口（飞书面试间、在线笔试页、IDE）不会收到
+  WM_ACTIVATE(WA_INACTIVE) / blur。这类平台靠"页面失焦 / 离开界面"判断
+  切屏，一旦被抢前台就会给面试官弹"对方退出界面"之类的提示。
+  仅靠 Qt.WindowDoesNotAcceptFocus 不够稳（Qt 只加样式位），所以
+  WM_MOUSEACTIVATE 一律回 MA_NOACTIVATE，命中测试再单独放行点击。
 - 防截图：SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)。
   它与热键无关，是 DWM 层的显示亲和性——PrtSc / Ctrl+Win+S /
   Win+Shift+S 等系统截图对窗口像素返回全黑，因此截不到本窗口。
@@ -53,6 +59,7 @@ MODE_DRAG = 0
 FLAG_LEFT, FLAG_TOP, FLAG_RIGHT, FLAG_BOTTOM = 1, 2, 4, 8
 
 WS_EX_LAYERED = 0x00080000
+WS_EX_NOACTIVATE = 0x08000000
 LWA_COLORKEY = 0x00000001
 LWA_ALPHA = 0x00000002
 GWL_EXSTYLE = -20
@@ -87,8 +94,12 @@ user32.SetWindowPos.restype = ctypes.c_int
 # 下会崩溃（0xC0000005），故改用 Win32 窗口过程子类化：在本窗口的
 # WM_NCHITTEST 一律返回 HTCLIENT，其余消息交回原窗口过程。完全不经过
 # Qt 的 native event 桥接，不触碰事件循环。
+# WM_MOUSEACTIVATE 回 MA_NOACTIVATE：系统在真实点击时先问这个，回 3 就是
+# "把点击给我，但别激活我"——正在用的面试页因此不会失焦。
 WM_NCHITTEST = 0x0084
 HTCLIENT = 1
+WM_MOUSEACTIVATE = 0x0021
+MA_NOACTIVATE = 3
 GWLP_WNDPROC = -4
 
 _WNDPROC = ctypes.WINFUNCTYPE(
@@ -111,6 +122,9 @@ def _hit_test_proc(hwnd: int, msg: int, wp, lp) -> int:
         old_proc = _subclassed.get(hwnd, (None, None))[0]
         if msg == WM_NCHITTEST:
             return HTCLIENT
+        if msg == WM_MOUSEACTIVATE:
+            # 点击交给自己处理，但不激活窗口（否则面试页/笔试页会失焦）
+            return MA_NOACTIVATE
         if old_proc is not None:
             return user32.CallWindowProcW(old_proc, hwnd, msg, wp, lp)
     except Exception:
@@ -119,12 +133,19 @@ def _hit_test_proc(hwnd: int, msg: int, wp, lp) -> int:
 
 
 def install_hit_test(hwnd: int) -> None:
-    """为 hwnd 子类化窗口过程，使整窗矩形可鼠标点击（幂等）。"""
+    """为 hwnd 子类化窗口过程：整窗可点击，且点击不激活窗口（幂等）。"""
     if hwnd in _subclassed:
         return
     callback = _WNDPROC(_hit_test_proc)
     old_proc = user32.SetWindowLongPtrW(hwnd, GWLP_WNDPROC, callback)
     _subclassed[hwnd] = (old_proc, callback)
+
+
+def make_no_activate(hwnd: int) -> None:
+    """给窗口补上 WS_EX_NOACTIVATE（不抢前台），幂等。"""
+    style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+    if not style & WS_EX_NOACTIVATE:
+        user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_NOACTIVATE)
 
 
 class OverlayWindow(QWidget):
@@ -150,7 +171,12 @@ class OverlayWindow(QWidget):
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool
+            # 关键：不抢前台。否则点一下悬浮窗去拖动，正在用的飞书面试间 /
+            # 在线笔试页就会收到失焦(blur)，平台侧会判"离开界面"并提示面试官。
+            | Qt.WindowType.WindowDoesNotAcceptFocus
         )
+        # 显示时也不要激活（Qt 默认 show() 会抢前台）
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         # 周期性重新断言 topmost，防止其他窗口激活时被短暂盖住/消失
         self._topmost_timer = QTimer(self)
         self._topmost_timer.setInterval(TOPMOST_REFRESH_MS)
@@ -162,7 +188,8 @@ class OverlayWindow(QWidget):
         self._apply_font(config.font_size)
         self.setMinimumSize(1, 1)   # 允许缩到极小（去掉 300x160 下限约束）
         self.setMouseTracking(True)     # 悬停边缘时显示缩放光标
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)   # 支持方向键滚动
+        # 不接键盘：窗口本来就不激活，方向键滚动由全局热键承担
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._layered_ready = False
 
         self.apply_settings(config)
@@ -462,7 +489,11 @@ class OverlayWindow(QWidget):
             return
         hwnd = int(self.winId())
         style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-        user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED)
+        # 顺带补上 WS_EX_NOACTIVATE：即便 Qt 之后重建/刷新样式丢了它，点窗口
+        # 也不会抢前台（WM_MOUSEACTIVATE 那条是第二道保险）。
+        user32.SetWindowLongW(
+            hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_NOACTIVATE
+        )
         # 刷新非客户区，同时显式断言 topmost：
         # 用 HWND_TOPMOST(而非 None+SWP_NOZORDER)，否则 SWP_FRAMECHANGED
         # 重建帧时会丢失 topmost 层级，导致打开其他程序后悬浮窗被盖住。
@@ -481,6 +512,8 @@ class OverlayWindow(QWidget):
         exclude_from_capture(int(self.winId()))
         # 命中测试子类化：透明(色键)区域也保持可点击，支持鼠标拖动/缩放
         install_hit_test(int(self.winId()))
+        # 三保险：样式位补齐（防 Qt 某些时机把 exstyle 重写掉）
+        make_no_activate(int(self.winId()))
         # 周期性刷新 topmost，持续保持最前
         self._topmost_timer.start()
         self._reassert_topmost()
